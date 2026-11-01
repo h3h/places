@@ -304,13 +304,18 @@ let spots=[];
 function cluster(){
   const pts=filtered().slice(); const R=60; const out=[];
   const dist=(a,b)=>d3.geoDistance([a.lon,a.lat],[b.lon,b.lat])*6371;
+  // neighbors within R, in pts order; only pairs inside R's latitude span get the exact distance check
+  const n=pts.length, ord=d3.range(n).sort((a,b)=>pts[a].lat-pts[b].lat), near=pts.map(()=>[]), DLAT=R/6371*180/Math.PI*1.001;
+  for(let a=0;a<n;a++){ const i=ord[a];
+    for(let b=a;b<n&&pts[ord[b]].lat-pts[i].lat<DLAT;b++){ const j=ord[b]; if(dist(pts[i],pts[j])<R){ near[i].push(j); if(j!==i) near[j].push(i); } } }
+  near.forEach(l=>l.sort((a,b)=>a-b));
   // seed from densest point first
-  const dens=pts.map(p=>({p,n:pts.reduce((s,q)=>s+(dist(p,q)<R?1:0),0)})).sort((a,b)=>b.n-a.n);
+  const dens=pts.map((p,i)=>({p,i,n:near[i].length})).sort((a,b)=>b.n-a.n);
   const used=new Set();
-  for(const {p} of dens){ if(used.has(p)) continue; const mem=pts.filter(q=>!used.has(q)&&dist(p,q)<R); mem.forEach(q=>used.add(q));
+  for(const {p,i} of dens){ if(used.has(p)) continue; const mem=near[i].map(j=>pts[j]).filter(q=>!used.has(q)); mem.forEach(q=>used.add(q));
     const cities=d3.rollups(mem.filter(q=>q.ci&&!q.cin),v=>v.length,q=>q.ci).sort((a,b)=>b[1]-a[1]);
     let nm=cities.length?cities[0][0]:null;
-    if(!nm){ let bd=Infinity; for(const q of ALL){ if(!q.ci) continue; const dd=dist(p,q); if(dd<bd){bd=dd;nm=q.ci} } if(bd>200) nm=p.n; }
+    if(!nm){ let bd=Infinity; for(const q of ALL){ if(!q.ci || Math.abs(q.lat-p.lat)/DLAT*R>=bd) continue; const dd=dist(p,q); if(dd<bd){bd=dd;nm=q.ci} } if(bd>200) nm=p.n; }
     out.push({name:nm, n:mem.length, mem,
       lon:d3.mean(mem,q=>q.lon), lat:d3.mean(mem,q=>q.lat)}); }
   spots=out.sort((a,b)=>b.n-a.n);
