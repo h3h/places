@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Bradford's Places Heat Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen map with a floating survey panel (stacked under the map on phones). Palette: Tokyo Night, single dark look. */
+:root{
+  --ocean:#16161e; --land:#24283b; --border:#414868; --state:#2f344d;
+  --ink:#c0caf5; --muted:#7c84ad; --panel:#1a1b26ee; --line:#2f344d;
+  --saved:#bb9af7; --review:#f7768e; --want:#9ece6a; --accent:#7aa2f7; --halo:#16161e; --road:#7c84ad; color-scheme:dark;
+  --display:"Archivo",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--ocean);color:var(--ink);font-family:var(--display);font-size:14px;overflow:hidden}
+.app{position:relative;height:100%}
+.mapwrap{position:absolute;inset:0}
+#map{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#map:active{cursor:grabbing}
+.panel{position:absolute;top:max(16px,env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));width:308px;max-height:calc(100% - 32px);
+  overflow:auto;background:var(--panel);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:10px;
+  padding:18px 18px 14px;display:flex;flex-direction:column;gap:16px;box-shadow:0 6px 24px #0002}
+h1{margin:0;font-weight:800;font-stretch:72%;font-size:30px;line-height:.95;letter-spacing:-.01em;text-transform:uppercase;text-wrap:balance}
+.sub{margin:6px 0 0;color:var(--muted);font-size:12.5px;line-height:1.4}
+.label{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;font-stretch:110%}
+.group{display:flex;flex-direction:column;gap:8px}
+.layers{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.seg button{line-height:1.2;padding:7px 4px}
+.legend{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.lgh{display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:5px}
+.lgh .ct{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sw{width:9px;height:9px;border-radius:50%;flex:none}
+.ramp.rf{background:linear-gradient(90deg,#4b3a8c,#7a5cc7,#bb9af7,#f7768e,#ffd1dc)}
+.ramp.rw{background:linear-gradient(90deg,#1d5f5c,#1f8f86,#73daca,#9ece6a,#e6f5b0)}
+.chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.chk input{accent-color:var(--saved);margin:0}
+.chip{display:flex;flex-direction:column;gap:2px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink);
+  font:inherit;text-align:left;cursor:pointer}
+.chip .num{font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.chip .nm{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.chip .sw{width:9px;height:9px;border-radius:50%;flex:none}
+.chip[aria-pressed="false"]{opacity:.42}
+.chip[aria-pressed="false"] .num{text-decoration:line-through}
+.chip:focus-visible,.seg button:focus-visible,.spot:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;padding:7px 0;border:0;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--ocean)}
+.row{display:flex;align-items:center;gap:10px}
+.row input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
+.val{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;min-width:68px;text-align:right}
+.ramp{height:8px;border-radius:4px;background:linear-gradient(90deg,#3d59a1,#9d7cd8,#f7768e,#ff9e64,#e0af68)}
+.rampl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.cats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.cat{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:baseline;width:100%;padding:5px 2px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;text-align:left;cursor:pointer;border-radius:4px}
+.cat:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.cat[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.cat .ct{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cat .bars{grid-column:1/3;display:flex;height:4px;border-radius:2px;overflow:hidden;background:var(--line)}
+.cat .bars i{display:block;height:100%}
+.cat:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.catnote{font-size:11.5px;color:var(--muted);margin:0}
+.spots{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.spot{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:baseline;width:100%;padding:6px 2px;border:0;border-top:1px solid var(--line);
+  background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.spot:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.spot .rk{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.spot .ct{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.spot .bar{grid-column:2/4;height:3px;border-radius:2px;background:var(--accent);opacity:.55;margin-top:3px}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+.btn{padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--ink);font:inherit;font-size:12px;cursor:pointer}
+.note{font-size:11.5px;color:var(--muted);line-height:1.45;margin:0}
+.card{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));width:290px;background:var(--panel);
+  backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 24px #0002}
+.card h2{margin:0;font-size:17px;font-weight:700;font-stretch:88%;line-height:1.15;padding-right:22px}
+.card .meta{font-size:12px;color:var(--muted);line-height:1.4}
+.card .coord{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.card a{color:var(--accent);font-size:12.5px;font-weight:600}
+.card .x{position:absolute;top:8px;right:10px;border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--land);font-size:12px;padding:4px 8px;border-radius:5px;white-space:nowrap;transform:translate(-50%,-130%)}
+.zoom{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:max(16px,env(safe-area-inset-top,0px));display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.zoom button{width:34px;height:34px;border:0;background:transparent;color:var(--ink);font-size:18px;cursor:pointer}
+.zoom button+button{border-top:1px solid var(--line)}
+
+.searchbtn{position:absolute;top:max(16px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;
+  min-width:min(340px,calc(100% - 140px));padding:9px 12px 9px 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel);backdrop-filter:blur(8px);
+  color:var(--muted);font:inherit;font-size:13px;cursor:text;box-shadow:0 6px 24px #0003}
+.searchbtn:hover{color:var(--ink)}
+.searchbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.searchbtn svg{flex:none}
+.searchbtn .kbd{margin-left:auto}
+.kbd{font-family:var(--mono);font-size:11px;padding:2px 6px;border:1px solid var(--line);border-radius:5px;color:var(--muted)}
+.pal-back{position:fixed;inset:0;background:#0008;z-index:40;display:flex;justify-content:center;align-items:flex-start;
+  padding-top:max(10vh,env(safe-area-inset-top,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.pal{width:min(560px,100%);background:var(--ocean);border:1px solid var(--border);border-radius:12px;box-shadow:0 24px 60px #000a;overflow:hidden;display:flex;flex-direction:column;max-height:70vh}
+.pal-in{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);color:var(--muted)}
+.pal-in input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-size:17px}
+.pal-in input::placeholder{color:var(--muted)}
+.pal-list{list-style:none;margin:0;padding:6px;overflow:auto}
+.pal-item{display:grid;grid-template-columns:18px 1fr auto;gap:2px 10px;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer}
+.pal-item[aria-selected="true"]{background:color-mix(in srgb,var(--accent) 20%,transparent)}
+.pal-item .ic{grid-column:1;grid-row:1/3;display:flex;justify-content:center;color:var(--muted)}
+.pal-item .nm{grid-column:2;grid-row:1;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pal-item .nm mark{background:none;color:var(--accent);font-weight:700}
+.pal-item .sb{grid-column:2;grid-row:2;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pal-item .ty{grid-column:3;grid-row:1/3;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.pal-empty{padding:18px 16px;color:var(--muted);font-size:13px}
+.pal-foot{display:flex;gap:14px;padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+@media (max-width:700px){ .searchbtn{min-width:0;width:calc(100% - 90px);left:max(16px,env(safe-area-inset-left,0px));transform:none} .searchbtn .kbd{display:none} }
+@media (max-width:700px){
+  body{overflow:auto}
+  .app{height:auto}
+  .mapwrap{position:relative;height:62vh}
+  .panel{position:static;width:auto;max-height:none;border-radius:0;border-width:1px 0 0;box-shadow:none;backdrop-filter:none;
+    padding-block:18px 24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--land)}
+  .card{left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));width:auto;bottom:12px}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="mapwrap" id="mapwrap">
+    <canvas id="map" aria-label="Heat map of verified favorites and reviewed Google Maps places"></canvas>
+    <button class="searchbtn" id="searchbtn" aria-label="Search places, cities and countries"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><span>Search places, cities, countries</span><span class="kbd" id="kbdhint">⌘K</span></button>
+    <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button></div>
+    <div class="tip" id="tip" hidden></div>
+    <div class="card" id="card" hidden></div>
+  </div>
+  <aside class="panel">
+    <div>
+      <h1>Bradford's<br>Places</h1>
+      <p class="sub">Your verified favorites, reviews and Want to go list from Google Maps, <span id="span"></span>.</p>
+    </div>
+    <div class="group">
+      <span class="label">Places</span>
+      <div class="seg" id="view">
+        <button data-v="fav" aria-pressed="false">Favorite Places</button>
+        <button data-v="want" aria-pressed="false">Places I Want to Go</button>
+        <button data-v="both" aria-pressed="true">Both</button>
+      </div>
+      <div class="legend">
+        <div id="lgf"><div class="lgh"><span class="sw" style="background:var(--saved)"></span>Favorite Places<span class="ct" id="nf">0</span></div><div class="ramp rf"></div></div>
+        <div id="lgw"><div class="lgh"><span class="sw" style="background:var(--want)"></span>Places I Want to Go<span class="ct" id="nw">0</span></div><div class="ramp rw"></div></div>
+        <div class="rampl"><span>One place</span><span>Dense cluster</span></div>
+      </div>
+      <label class="chk" id="lrw"><input type="checkbox" id="lr" checked><span class="sw" style="background:var(--review)"></span><span>Include places I've reviewed (<span id="nr">0</span>)</span></label>
+    </div>
+    <div class="group">
+      <span class="label">Show</span>
+      <div class="seg" id="mode">
+        <button data-m="heat" aria-pressed="false">Heat</button>
+        <button data-m="both" aria-pressed="true">Heat + pins</button>
+        <button data-m="pins" aria-pressed="false">Pins</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="label">Categories</span>
+      <ul class="cats" id="cats"></ul>
+      <p class="catnote" id="catnote"></p>
+    </div>
+    <div class="group">
+      <span class="label">Hot spots <span style="text-transform:none;letter-spacing:0">(within ~60 km)</span></span>
+      <ul class="spots" id="spots"></ul>
+    </div>
+    <div class="group">
+      <span class="label">Jump to</span>
+      <div class="btns">
+        <button class="btn" data-b="-107,25.5,-93,37">Texas &amp; NM</button>
+        <button class="btn" data-b="-126,14,-66,50">North America</button>
+        <button class="btn" data-b="-98.05,30.1,-97.55,30.5">Austin</button>
+        <button class="btn" data-b="-170,-48,179,72">World</button>
+      </div>
+    </div>
+    <p class="note" id="note"></p>
+  </aside>
+</div>
+
+<div class="pal-back" id="palback" hidden>
+  <div class="pal" role="dialog" aria-modal="true" aria-label="Search">
+    <div class="pal-in"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      <input id="palq" type="text" autocomplete="off" spellcheck="false" placeholder="Search places, cities, countries" aria-controls="pallist" aria-autocomplete="list"><span class="kbd">esc</span></div>
+    <ul class="pal-list" id="pallist" role="listbox"></ul>
+    <div class="pal-foot"><span><span class="kbd">↑</span> <span class="kbd">↓</span> to move</span><span><span class="kbd">↵</span> to go</span><span><span class="kbd">esc</span> to close</span></div>
+  </div>
+</div>
+<script id="pts" type="application/json">{{PTS}}</script>
+<script id="countries" type="application/json">{{COUNTRIES}}</script>
+<script id="roads" type="application/json">{{ROADS}}</script>
+<script id="states" type="application/json">{{STATES}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+(function(){
+const ALL = JSON.parse(document.getElementById('pts').textContent);
+const ct = JSON.parse(document.getElementById('countries').textContent);
+const st = JSON.parse(document.getElementById('states').textContent);
+const countries = topojson.feature(ct, ct.objects.countries);
+const borders = topojson.mesh(ct, ct.objects.countries, (a,b)=>a!==b);
+const stateLines = topojson.mesh(st, st.objects.states, (a,b)=>a!==b);
+ALL.forEach(p=>{p.y=p.d?+p.d.slice(0,4):null});
+
+const canvas = document.getElementById('map'), ctx = canvas.getContext('2d');
+const wrap = document.getElementById('mapwrap');
+const heat = document.createElement('canvas'), hctx = heat.getContext('2d', {willReadFrequently:true});
+const tip = document.getElementById('tip'), card = document.getElementById('card');
+let W=0,H=0,DPR=1, T=d3.zoomIdentity, colors={}, shown=[], quad=null, selected=null;
+const state = {view:'both', r:true, mode:'both', rad:8, yr:0};
+
+// one color ramp per place type
+function makeLUT(stops){const c=document.createElement('canvas');c.width=256;c.height=1;const g=c.getContext('2d');
+  const gr=g.createLinearGradient(0,0,256,0);stops.forEach(([c,o])=>gr.addColorStop(o,c));
+  g.fillStyle=gr;g.fillRect(0,0,256,1);return g.getImageData(0,0,256,1).data}
+const LUTF=makeLUT([['#4b3a8c',0],['#7a5cc7',.3],['#bb9af7',.55],['#f7768e',.8],['#ffd1dc',1]]), LUTW=makeLUT([['#1d5f5c',0],['#1f8f86',.3],['#73daca',.55],['#9ece6a',.8],['#e6f5b0',1]]);
+function heatLayer(list,LUT){ const r=state.rad;
+  heat.width=W; heat.height=H; hctx.clearRect(0,0,W,H);
+  for(const o of list){ const g=hctx.createRadialGradient(o.x,o.y,0,o.x,o.y,r);
+    g.addColorStop(0,'rgba(0,0,0,0.13)'); g.addColorStop(1,'rgba(0,0,0,0)'); hctx.fillStyle=g; hctx.fillRect(o.x-r,o.y-r,2*r,2*r); }
+  const img=hctx.getImageData(0,0,W,H), d=img.data;
+  for(let i=3;i<d.length;i+=4){ const a=d[i]; if(!a) continue; const j=Math.min(255,a*1.25|0)*4;
+    d[i-3]=LUT[j]; d[i-2]=LUT[j+1]; d[i-1]=LUT[j+2]; d[i]=Math.min(235, 70+a*2.4); }
+  hctx.putImageData(img,0,0); }
+
+const proj = d3.geoMercator();
+function base(){ return {s: W/(2*Math.PI), x: W/2, y: H/2}; }
+function applyT(){ const b=base(); proj.scale(b.s*T.k).translate([T.x + b.x*T.k, T.y + b.y*T.k]).clipExtent([[-50,-50],[W+50,H+50]]); }
+
+function readColors(){ const cs=getComputedStyle(document.documentElement);
+  ['ocean','land','border','state','ink','muted','saved','review','want','halo','road'].forEach(k=>colors[k]=cs.getPropertyValue('--'+k).trim()); }
+
+function filtered(){ return ALL.filter(p=>(p.k==='w' ? state.view!=='fav' : state.view!=='want' && (p.k==='s'||state.r)) && (p.y==null || p.y>=state.yr) && (!state.cat || p.b===state.cat)); }
+
+// Natural Earth roads within 50 km of a pin, delta-encoded at 1e-4 degrees
+const ROADS = JSON.parse(document.getElementById('roads').textContent).map(a=>{ const major=a[0]; const pts=[]; let x=0,y=0; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for(let i=1;i<a.length;i+=2){ x+=a[i]; y+=a[i+1]; const lon=x/1e4, lat=y/1e4; pts.push([lon,lat]); if(lon<x0)x0=lon; if(lon>x1)x1=lon; if(lat<y0)y0=lat; if(lat>y1)y1=lat; }
+  return {major, pts, bb:[x0,y0,x1,y1]}; });
+const ROAD_IN=90, ROAD_FULL=220; // zoom factor where roads start to fade in, and where they are fully shown
+function drawRoads(){
+  if(T.k<ROAD_IN) return;
+  const a=Math.min(1,(T.k-ROAD_IN)/(ROAD_FULL-ROAD_IN));
+  const tl=proj.invert([-20,-20]), br=proj.invert([W+20,H+20]); if(!tl||!br) return;
+  const [vx0,vy1]=tl, [vx1,vy0]=br;
+  ctx.save(); ctx.strokeStyle=colors.road; ctx.lineCap='round'; ctx.lineJoin='round';
+  for(const pass of [0,1]){
+    ctx.globalAlpha=a*(pass?0.55:0.32); ctx.lineWidth=pass?1.3:0.8; ctx.beginPath();
+    for(const r of ROADS){ if(r.major!==pass) continue; const b=r.bb; if(b[2]<vx0||b[0]>vx1||b[3]<vy0||b[1]>vy1) continue;
+      let first=true; for(const p of r.pts){ const [x,y]=proj(p); if(first){ctx.moveTo(x,y); first=false;} else ctx.lineTo(x,y);} }
+    ctx.stroke(); }
+  ctx.restore();
+}
+function draw(){
+  if(!W||!H) return;
+  applyT();
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=colors.ocean; ctx.fillRect(0,0,W,H);
+  const path=d3.geoPath(proj,ctx);
+  ctx.beginPath(); path(countries); ctx.fillStyle=colors.land; ctx.fill();
+  ctx.beginPath(); path(stateLines); ctx.strokeStyle=colors.state; ctx.lineWidth=.8; ctx.stroke();
+  ctx.beginPath(); path(borders); ctx.strokeStyle=colors.border; ctx.lineWidth=1; ctx.stroke();
+  drawRoads();
+
+  shown = filtered().map(p=>{const [x,y]=proj([p.lon,p.lat]); return {p,x,y}}).filter(o=>o.x>-80&&o.y>-80&&o.x<W+80&&o.y<H+80);
+  quad = d3.quadtree(shown, d=>d.x, d=>d.y);
+
+  if(state.mode!=='pins'){
+    const fav=shown.filter(o=>o.p.k!=='w'), want=shown.filter(o=>o.p.k==='w');
+    if(want.length){ heatLayer(want,LUTW); ctx.drawImage(heat,0,0,W,H); }
+    if(fav.length){ heatLayer(fav,LUTF); ctx.globalCompositeOperation=want.length?'screen':'source-over'; ctx.drawImage(heat,0,0,W,H); ctx.globalCompositeOperation='source-over'; }
+  }
+  if(state.mode!=='heat'){
+    const big=T.k>40;
+    for(const o of shown){ ctx.beginPath(); ctx.arc(o.x,o.y,big?4.5:2.6,0,7);
+      ctx.fillStyle=o.p.k==='s'?colors.saved:o.p.k==='w'?colors.want:colors.review; ctx.fill();
+      ctx.lineWidth=big?1.5:1; ctx.strokeStyle=colors.halo; ctx.stroke(); }
+  }
+  if(selected){ const [x,y]=proj([selected.lon,selected.lat]); ctx.beginPath(); ctx.arc(x,y,9,0,7); ctx.lineWidth=2.5; ctx.strokeStyle=colors.ink; ctx.stroke(); }
+  drawLabels();
+  drawScale();
+}
+function drawScale(){
+  const lat=proj.invert([W/2,H/2])[1]; const kmpx=(2*Math.PI*6371*Math.cos(lat*Math.PI/180))/(2*Math.PI*proj.scale());
+  const target=kmpx*110; const p=Math.pow(10,Math.floor(Math.log10(target))); const km=[1,2,5].map(m=>m*p).filter(v=>v<=target).pop()||p; const px=km/kmpx;
+  const x0=W-px-24-(card.hidden?0:0), y0=H-18; const x=W>700?x0:16;
+  ctx.strokeStyle=colors.ink; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(x,y0-5); ctx.lineTo(x,y0); ctx.lineTo(x+px,y0); ctx.lineTo(x+px,y0-5); ctx.stroke();
+  ctx.font='500 11px "IBM Plex Mono", ui-monospace, monospace'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+  const lbl=(km>=1?km.toLocaleString():km)+' km'; ctx.lineWidth=3; ctx.strokeStyle=colors.halo; ctx.strokeText(lbl,x+px/2,y0-4); ctx.fillStyle=colors.ink; ctx.fillText(lbl,x+px/2,y0-4);
+}
+
+// hot spots: greedy clustering on great-circle distance
+let spots=[];
+function cluster(){
+  const pts=filtered().slice(); const R=60; const out=[];
+  const dist=(a,b)=>d3.geoDistance([a.lon,a.lat],[b.lon,b.lat])*6371;
+  // seed from densest point first
+  const dens=pts.map(p=>({p,n:pts.reduce((s,q)=>s+(dist(p,q)<R?1:0),0)})).sort((a,b)=>b.n-a.n);
+  const used=new Set();
+  for(const {p} of dens){ if(used.has(p)) continue; const mem=pts.filter(q=>!used.has(q)&&dist(p,q)<R); mem.forEach(q=>used.add(q));
+    const cities=d3.rollups(mem.filter(q=>q.ci&&!q.cin),v=>v.length,q=>q.ci).sort((a,b)=>b[1]-a[1]);
+    let nm=cities.length?cities[0][0]:null;
+    if(!nm){ let bd=Infinity; for(const q of ALL){ if(!q.ci) continue; const dd=dist(p,q); if(dd<bd){bd=dd;nm=q.ci} } if(bd>200) nm=p.n; }
+    out.push({name:nm, n:mem.length, mem,
+      lon:d3.mean(mem,q=>q.lon), lat:d3.mean(mem,q=>q.lat)}); }
+  spots=out.sort((a,b)=>b.n-a.n);
+}
+function drawLabels(){
+  if(state.mode==='pins' && T.k>40) return;
+  ctx.font='600 12px Archivo, system-ui, sans-serif'; ctx.lineJoin='round'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const placed=[];
+  for(const s of spots.slice(0,40)){ if(s.n<3) break; const [x,y]=proj([s.lon,s.lat]); if(x<0||y<0||x>W||y>H) continue;
+    const txt=s.name.split(',')[0]+'  '+s.n; const w=ctx.measureText(txt).width+8, ly=y-state.rad*.55-10;
+    if(placed.some(b=>Math.abs(b.x-x)<(b.w+w)/2 && Math.abs(b.y-ly)<16)) continue; placed.push({x,y:ly,w});
+    ctx.lineWidth=3.5; ctx.strokeStyle=colors.halo; ctx.strokeText(txt,x,ly); ctx.fillStyle=colors.ink; ctx.fillText(txt,x,ly); }
+}
+
+function renderSpots(){
+  const ul=document.getElementById('spots'); ul.innerHTML='';
+  const top=spots.slice(0,10), max=top[0]?.n||1;
+  top.forEach((s,i)=>{ const li=document.createElement('li'); const b=document.createElement('button'); b.className='spot';
+    b.innerHTML=`<span class="rk">${String(i+1).padStart(2,'0')}</span><span>${esc(s.name)}</span><span class="ct">${s.n}</span><span class="bar" style="width:${s.n/max*100}%"></span>`;
+    b.onclick=()=>{ const ex=d3.extent(s.mem,q=>q.lon), ey=d3.extent(s.mem,q=>q.lat); fly([ex[0],ey[0],ex[1],ey[1]],.35); };
+    li.appendChild(b); ul.appendChild(li); });
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// zoom
+const zoom=d3.zoom().scaleExtent([.8,6000]).on('zoom',e=>{T=e.transform; tip.hidden=true; schedule();});
+let raf=0; function schedule(){ if(!raf) raf=requestAnimationFrame(()=>{raf=0;draw();}); }
+d3.select(canvas).call(zoom).on('dblclick.zoom',null);
+function boundsT(b,minSpan=0){ // b=[w,s,e,n]
+  let [w,s,e,n]=b; if(e-w<minSpan){const c=(w+e)/2;w=c-minSpan/2;e=c+minSpan/2} if(n-s<minSpan*.7){const c=(s+n)/2;s=c-minSpan*.35;n=c+minSpan*.35}
+  const bp=base(); const p0=d3.geoMercator().scale(bp.s).translate([bp.x,bp.y]);
+  const [x0,y0]=p0([w,n]), [x1,y1]=p0([e,s]);
+  const padL = W>700 ? 340 : 20;
+  const aw=W-padL-30, ah=H-40; const k=Math.min(aw/(x1-x0), ah/(y1-y0))*.92;
+  const cx=(x0+x1)/2, cy=(y0+y1)/2; return d3.zoomIdentity.translate(padL+aw/2 - k*cx, 20+ah/2 - k*cy).scale(k);
+}
+function fly(b,minSpan){ d3.select(canvas).transition().duration(matchMedia('(prefers-reduced-motion: reduce)').matches?0:900).call(zoom.transform, boundsT(b,minSpan)); }
+document.getElementById('zin').onclick=()=>d3.select(canvas).transition().duration(300).call(zoom.scaleBy,2);
+document.getElementById('zout').onclick=()=>d3.select(canvas).transition().duration(300).call(zoom.scaleBy,.5);
+document.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>fly(b.dataset.b.split(',').map(Number)));
+
+// hover + click
+function nearest(ev){ const r=canvas.getBoundingClientRect(); const x=ev.clientX-r.left, y=ev.clientY-r.top; return quad&&quad.find(x,y,10); }
+canvas.addEventListener('mousemove',ev=>{ const o=nearest(ev); if(o){ tip.textContent=o.p.n; tip.style.left=o.x+'px'; tip.style.top=o.y+'px'; tip.hidden=false; canvas.style.cursor='pointer'; }
+  else { tip.hidden=true; canvas.style.cursor=''; } });
+canvas.addEventListener('mouseleave',()=>tip.hidden=true);
+canvas.addEventListener('click',ev=>{ if(ev.defaultPrevented) return; const o=nearest(ev); if(!o){ selected=null; card.hidden=true; draw(); return; } show(o.p); });
+const BUCKETS=[
+ ['Hot springs & spas',/hot spring|\bspa\b|sauna|bath|thermal|onsen|jjimjilbang/i],
+ ['Coffee & cafés',/coffee|caf[eé]|espresso|tea house|roaster/i],
+ ['Bakeries & sweets',/bakery|donut|doughnut|ice cream|gelato|dessert|chocolat|pastry|churro|churrer|creamery|candy|pastelería|panader/i],
+ ['Bars & breweries',/\bbar\b|pub|brew|winery|wine|distiller|taproom|cocktail|beer|lounge|saloon|speakeasy|mezcal|cantina/i],
+ ['Bookstores & libraries',/book|library|librer|biblioteca/i],
+ ['Lodging & camping',/hotel|motel|\binn\b|resort|lodge|campground|camping|rv park|hostel|cabin|glamping|bed & breakfast|vacation|naturist|nudist|guest house|holiday park|holiday apartment|villa|lodging|chalet/i],
+ ['Restaurants',/restaurant|taco|taquer|barbecue|bbq|pizza|deli|food|diner|grill|sushi|ramen|burger|bistro|eatery|kitchen|brunch|breakfast|steak|seafood|noodle|sandwich|poke|birria|meal/i],
+ ['Parks & outdoors',/park|trail|hik|beach|lake|river|falls|waterfall|nature|preserve|canyon|cave|grotto|mountain|scenic|lookout|viewpoint|garden|forest|recreation|wildlife|spring|island|peak|crater|dune|desert|reserve|sanctuary|bridge|overlook|ravine|cliff|golf|marina|off.road|atv|boat rental|tennis|swimming/i],
+ ['Museums & sights',/museum|gallery|landmark|histor|attraction|monument|church|cathedral|castle|palace|observatory|\bart\b|cultur|theat|cinema|planetarium|aquarium|zoo|stadium|plaza|tour|ruin|temple|mission|memorial|sculpture|university|cemetery/i],
+ ['Errands & services',/car wash|detailing|tint|storage|repair|laundr|dry clean|roofing|pest|propane|charging station|recycling|coworking|caterer|mechanic|contractor|barber|salon|hairdresser/i],
+ ['Shops & markets',/store|shop|market|boutique|mall|grocer|outlet|tienda|mercado|supply|dealer/i],
+];
+function bucket(p){ const g=p.g||[]; if(/hot springs?\b/i.test(p.n)) return 'Hot springs & spas'; for(const c of g){ for(const [b,re] of BUCKETS){ if(re.test(c)) return b; } } return g.length?'Other':'Not categorized'; }
+ALL.forEach(p=>{p.b=bucket(p)});
+function renderCats(){
+  const grp=document.getElementById('cats').closest('.group'); grp.hidden=!ALL.some(p=>p.g&&p.g.length); if(grp.hidden) return;
+  const pts=ALL.filter(p=>(p.k==='w' ? state.view!=='fav' : state.view!=='want' && (p.k==='s'||state.r)));
+  const m=new Map(); pts.forEach(p=>{ const e=m.get(p.b)||{f:0,w:0}; if(p.k==='w') e.w++; else e.f++; m.set(p.b,e); });
+  const tail=b=>b==='Other'?1:b==='Not categorized'?2:0; const rows=[...m.entries()].sort((a,b)=>tail(a[0])-tail(b[0]) || (b[1].f+b[1].w)-(a[1].f+a[1].w));
+  const max=Math.max(1,...rows.map(r=>r[1].f+r[1].w)); const ul=document.getElementById('cats'); ul.innerHTML='';
+  for(const [b,e] of rows){ const n=e.f+e.w; const li=document.createElement('li'); const btn=document.createElement('button'); btn.className='cat'; btn.setAttribute('aria-pressed', state.cat===b);
+    btn.innerHTML=`<span>${esc(b)}</span><span class="ct">${n}</span><span class="bars" style="width:${(n/max*100).toFixed(1)}%"><i style="width:${(e.f/n*100).toFixed(1)}%;background:var(--saved)"></i><i style="width:${(e.w/n*100).toFixed(1)}%;background:var(--want)"></i></span>`;
+    btn.onclick=()=>{ state.cat = state.cat===b ? null : b; refresh(); };
+    li.appendChild(btn); ul.appendChild(li); }
+  document.getElementById('catnote').textContent = state.cat ? `Showing only ${state.cat}. Click it again to show everything.` : 'Click a category to show only those places.';
+}
+function show(p){ selected=p;
+  const kind=p.k==='s'?'Favorite place':p.k==='w'?'Place I want to go':'Reviewed'+(p.st?` · ${'★'.repeat(p.st)}${'☆'.repeat(5-p.st)}`:'');
+  card.innerHTML=`<button class="x" aria-label="Close">×</button><h2>${esc(p.n)}</h2>
+   ${p.g&&p.g.length?`<div class="meta" style="color:var(--ink)">${esc(p.g.join(' · '))}</div>`:''}<div class="meta">${esc(p.a||'')}</div><div class="meta">${kind}${p.d?' · '+p.d:''}${p.ap?' · position within ~1 km':''}</div>
+   <div class="coord">${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}</div>
+   ${p.u?`<a href="${esc(p.u)}" target="_blank" rel="noopener">Open in Google Maps ↗</a>`:''}`;
+  card.hidden=false; card.querySelector('.x').onclick=()=>{selected=null;card.hidden=true;draw();}; draw(); }
+
+// ---- search palette ----
+const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+function pctBounds(ps,lo=0.05,hi=0.95){ const xs=ps.map(p=>p.lon).sort((a,b)=>a-b), ys=ps.map(p=>p.lat).sort((a,b)=>a-b);
+  const q=(a,f)=>a[Math.min(a.length-1,Math.max(0,Math.round(f*(a.length-1))))]; return ps.length<5?[xs[0],ys[0],xs[xs.length-1],ys[ys.length-1]]:[q(xs,lo),q(ys,lo),q(xs,hi),q(ys,hi)]; }
+const IDX=[];
+{ const byCity=new Map(), byCountry=new Map();
+  for(const p of ALL){ if(p.ci){ (byCity.get(p.ci)||byCity.set(p.ci,[]).get(p.ci)).push(p); } if(p.co){ (byCountry.get(p.co)||byCountry.set(p.co,[]).get(p.co)).push(p); } }
+  for(const [n,ps] of byCountry) IDX.push({t:'country',n,ps,k:norm(n),rank:0});
+  for(const [n,ps] of byCity) IDX.push({t:'city',n,ps,k:norm(n.split(',')[0])+' '+norm(n),rank:1});
+  const seen=new Set();
+  for(const p of ALL){ const key=p.n+'|'+p.lat.toFixed(3); if(seen.has(key)) continue; seen.add(key); IDX.push({t:'place',n:p.n,p,k:norm(p.n),full:norm([p.n,(p.g||[]).join(' '),p.ci,p.co].join(' ')),rank:2}); } }
+function matchQ(k,q){ if(k===q) return 0; if(k.startsWith(q)) return 1; if((' '+k).includes(' '+q)) return 2; if(k.includes(q)) return 3; return -1; }
+function search(q){ q=norm(q).trim(); if(!q) return IDX.filter(e=>e.t==='city').sort((a,b)=>b.ps.length-a.ps.length).slice(0,6);
+  const words=q.split(/\s+/); const res=[];
+  for(const e of IDX){ let s=matchQ(e.k,q); if(s<0){ const hay=e.full||e.k; if(words.every(w=>(' '+hay).includes(' '+w))) s=4; else if(words.every(w=>hay.includes(w))) s=5; else continue; } res.push([s,e]); }
+  res.sort((a,b)=>a[0]-b[0] || a[1].rank-b[1].rank || (b[1].ps?.length||0)-(a[1].ps?.length||0) || a[1].n.length-b[1].n.length);
+  return res.slice(0,9).map(r=>r[1]); }
+function hl(name,q){ q=norm(q).trim(); if(!q) return esc(name); const i=norm(name).indexOf(q); if(i<0) return esc(name); return esc(name.slice(0,i))+'<mark>'+esc(name.slice(i,i+q.length))+'</mark>'+esc(name.slice(i+q.length)); }
+const ICON={country:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+  city:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V9l5-3v15M9 21V4l6 3v14M15 21v-9l5 2v7M3 21h18"/></svg>'};
+const palback=document.getElementById('palback'), palq=document.getElementById('palq'), pallist=document.getElementById('pallist');
+let palRes=[], palSel=0, palPrevFocus=null;
+function palRender(){ palRes=search(palq.value); palSel=Math.min(palSel,Math.max(0,palRes.length-1));
+  if(!palRes.length){ pallist.innerHTML='<li class="pal-empty">No places, cities or countries match that.</li>'; return; }
+  pallist.innerHTML=palRes.map((e,i)=>{ let sub,ic;
+    if(e.t==='place'){ const p=e.p; ic=`<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="${p.k==='s'?colors.saved:p.k==='w'?colors.want:colors.review}"/></svg>`;
+      sub=[p.g&&p.g[0], p.ci||p.co].filter(Boolean).join(' · '); }
+    else { ic=ICON[e.t]; const f=e.ps.filter(p=>p.k!=='w').length, w=e.ps.length-f; sub=`${e.ps.length} place${e.ps.length>1?'s':''}`+(f&&w?` · ${f} favorite · ${w} want to go`:''); }
+    return `<li class="pal-item" role="option" id="po${i}" aria-selected="${i===palSel}" data-i="${i}"><span class="ic">${ic}</span><span class="nm">${hl(e.n,palq.value)}</span><span class="ty">${e.t}</span><span class="sb">${esc(sub)}</span></li>`; }).join('');
+  palq.setAttribute('aria-activedescendant','po'+palSel); }
+function palOpen(){ palPrevFocus=document.activeElement; palback.hidden=false; palq.value=''; palSel=0; palRender(); palq.focus(); }
+function palClose(){ palback.hidden=true; if(palPrevFocus&&palPrevFocus.focus) palPrevFocus.focus(); }
+function ensureVisible(p){ let ch=false;
+  if(p.k==='w' && state.view==='fav'){ setView('both'); ch=true; }
+  if(p.k!=='w' && state.view==='want'){ setView('both'); ch=true; }
+  if(p.k==='r' && !state.r){ state.r=true; lr.checked=true; ch=true; }
+  if(state.cat && p.b!==state.cat){ state.cat=null; ch=true; }
+  if(ch) refresh(); }
+function palGo(e){ palClose(); if(!e) return;
+  if(e.t==='place'){ const p=e.p; ensureVisible(p); fly([p.lon,p.lat,p.lon,p.lat],0.03); setTimeout(()=>show(p), matchMedia('(prefers-reduced-motion: reduce)').matches?0:950); }
+  else { selected=null; card.hidden=true; if(state.cat){ state.cat=null; refresh(); } fly(pctBounds(e.ps, e.t==='country'?0.03:0, e.t==='country'?0.97:1), e.t==='country'?3:0.12); } }
+palq.addEventListener('input',()=>{ palSel=0; palRender(); });
+palq.addEventListener('keydown',ev=>{
+  if(ev.key==='ArrowDown'){ palSel=Math.min(palRes.length-1,palSel+1); palRender(); document.getElementById('po'+palSel)?.scrollIntoView({block:'nearest'}); ev.preventDefault(); }
+  else if(ev.key==='ArrowUp'){ palSel=Math.max(0,palSel-1); palRender(); document.getElementById('po'+palSel)?.scrollIntoView({block:'nearest'}); ev.preventDefault(); }
+  else if(ev.key==='Enter'){ palGo(palRes[palSel]); ev.preventDefault(); }
+  else if(ev.key==='Escape'){ palClose(); ev.preventDefault(); } });
+pallist.addEventListener('mousemove',ev=>{ const li=ev.target.closest('.pal-item'); if(li && +li.dataset.i!==palSel){ palSel=+li.dataset.i; pallist.querySelectorAll('.pal-item').forEach((x,i)=>x.setAttribute('aria-selected',i===palSel)); } });
+pallist.addEventListener('click',ev=>{ const li=ev.target.closest('.pal-item'); if(li) palGo(palRes[+li.dataset.i]); });
+palback.addEventListener('mousedown',ev=>{ if(ev.target===palback) palClose(); });
+document.getElementById('searchbtn').onclick=palOpen;
+if(!/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent)) document.getElementById('kbdhint').textContent='Ctrl K';
+document.addEventListener('keydown',ev=>{
+  if((ev.metaKey||ev.ctrlKey) && ev.key.toLowerCase()==='k'){ ev.preventDefault(); palback.hidden?palOpen():palClose(); }
+  else if(ev.key==='/' && palback.hidden && !/input|textarea/i.test(document.activeElement?.tagName||'')){ ev.preventDefault(); palOpen(); } });
+
+// controls
+function refresh(){ const f=filtered(); document.getElementById('nf').textContent=ALL.filter(p=>p.k==='s'&&p.y>=state.yr).length;
+  document.getElementById('nr').textContent=ALL.filter(p=>p.k==='r'&&p.y>=state.yr).length; document.getElementById('nw').textContent=ALL.filter(p=>p.k==='w').length; cluster(); renderSpots(); renderCats(); draw(); }
+const lr=document.getElementById('lr'); lr.onchange=()=>{state.r=lr.checked; refresh();};
+function setView(v){ state.view=v; document.querySelectorAll('#view button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===v));
+  document.getElementById('lgf').hidden=v==='want'; document.getElementById('lgw').hidden=v==='fav'; document.getElementById('lrw').hidden=v==='want';
+  try{localStorage.setItem('view',v)}catch(e){} refresh(); }
+document.querySelectorAll('#view button').forEach(b=>b.onclick=()=>setView(b.dataset.v));
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{state.mode=b.dataset.m;
+  document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); draw();});
+
+const yrs=d3.extent(ALL.filter(p=>p.y),p=>p.y); document.getElementById('span').textContent=`${yrs[0]}–${yrs[1]}`;
+const approxN=ALL.filter(p=>p.ap).length;
+document.getElementById('note').textContent=`${ALL.length} places mapped. Verified favorites are your starred places that have a name; 34 unnamed pins and addresses are left out. Want to go comes from your saved list, minus 2 unnamed entries. 76 places Google lists as permanently closed were removed (checked Oct 26, 2026).`;
+
+function resize(){ const r=wrap.getBoundingClientRect(); const first=!W; DPR=Math.min(2,devicePixelRatio||1);
+  W=Math.round(r.width); H=Math.round(r.height); canvas.width=W*DPR; canvas.height=H*DPR;
+  if(first){ T=boundsT([-170,-48,179,72]); d3.select(canvas).call(zoom.transform,T); } draw(); }
+new ResizeObserver(()=>resize()).observe(wrap);
+readColors();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{readColors();draw();});
+new MutationObserver(()=>{readColors();draw();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+let v0='both'; try{v0=localStorage.getItem('view')||'both'}catch(e){} setView(['fav','want','both'].includes(v0)?v0:'both');
+document.fonts&&document.fonts.ready.then(()=>draw());
+})();
+</script>
+</body>
+</html>

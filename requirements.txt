@@ -1,0 +1,4 @@
+# Python tools in tools/takeout and tools/roads
+numpy>=1.26
+scipy>=1.11
+s2sphere>=0.2.5

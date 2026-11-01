@@ -1,0 +1,13 @@
+# Build output (built in CI and deployed to Pages)
+dist/
+node_modules/
+
+# Raw personal source data: never commit
+/takeout/
+/raw/
+/local/
+*.zip
+data/import/
+data/browser/
+tools/roads/ne_10m_roads.geojson
+__pycache__/

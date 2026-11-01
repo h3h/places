@@ -9,6 +9,14 @@ Guidance for AI coding agents working in this repository.
 
 ## Project
 
-- The whole app is `index.html`: a self-contained page with its data embedded as JSON `<script>` tags. d3 and topojson load from cdnjs.
-- Every push to `main` deploys to GitHub Pages (https://h3h.github.io/places/) via `.github/workflows/pages.yml`.
-- Never commit raw Google Takeout exports or other personal source data; only the built page belongs here.
+- Edit the app in `src/template.html` and the data in `data/places.json`; never hand-edit `dist/` (build output, gitignored).
+- `npm run build` writes `dist/index.html`. Run it (and look at the page) before committing changes to the template or data.
+- After adding or moving places, run `npm run enrich` so country and city fields stay correct.
+- Every push to `main` builds on Node 26 and deploys to GitHub Pages (https://h3h.github.io/places/) via `.github/workflows/pages.yml`.
+- See README.md for the data update workflow and tools.
+
+## Privacy
+
+- The repo and site are public. Never commit raw Google Takeout exports, browser lookup results, or `local/` overrides; they're gitignored for that reason.
+- `data/places.json` holds only what the public page already shows. Don't add fields beyond that (e.g. review text).
+- Throttle any Google Maps lookups (the browser scripts default to one place every 2–3.5 s and stop on errors).

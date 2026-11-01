@@ -1,0 +1,5 @@
+{
+  "exclude": ["Name of a place to keep off the public map"],
+  "rename": {"Castillo de Balmoral": "Balmoral Castle"},
+  "approx": {"Faywood Hot Springs, New Mexico 88034": [32.555, -107.995]}
+}
