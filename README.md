@@ -14,6 +14,8 @@ Want to go list. Live at https://h3h.github.io/places/
 | `tools/enrich.mjs` | Recomputes each place's country (`co`) and display city (`ci`) |
 | `tools/takeout/import_takeout.py` | Turns a Google Takeout export into candidate places, optionally merging new ones |
 | `tools/roads/clip_roads.py` | Rebuilds `data/roads.json` from the Natural Earth roads dataset |
+| `data/water.json` | Natural Earth lakes and rivers near a place, in the roads format, shown with the roads |
+| `tools/roads/clip_water.py` | Rebuilds `data/water.json` from the Natural Earth lakes and rivers datasets |
 | `tools/browser/*.js` | Console scripts for a logged-in Google Maps tab: read the newest places in a list, and look up status, coordinates and categories |
 | `tools/browser/places_tool.py` | Feeds place IDs to those scripts and merges their results back into `data/places.json` |
 
@@ -54,7 +56,7 @@ npm run serve        # build, then serve on http://localhost:8000
 
 **From a fresh Takeout export:** request "Maps (your places)" and "Saved", extract it into `takeout/` (gitignored), and run `python3 tools/takeout/import_takeout.py --takeout takeout/Takeout --list "Want to go" --merge`. Only places not already in `data/places.json` are added, so earlier curation is kept.
 
-**Roads** (after places change a lot): download the Natural Earth roads GeoJSON (command in `tools/roads/clip_roads.py`) and run `python3 tools/roads/clip_roads.py`.
+**Roads** (after places change a lot): download the Natural Earth roads GeoJSON (command in `tools/roads/clip_roads.py`) and run `python3 tools/roads/clip_roads.py`. Lakes and rivers work the same way with `tools/roads/clip_water.py` (download commands in its header).
 
 Python tools need `pip install -r requirements.txt`.
 
@@ -64,4 +66,4 @@ Raw Takeout exports, browser results and private overrides (`takeout/`, `local/`
 
 ## Data sources
 
-Place data comes from my Google Maps account. Country borders: Natural Earth via `world-atlas` and `us-atlas`. Roads: Natural Earth 1:10m roads.
+Place data comes from my Google Maps account. Country borders: Natural Earth via `world-atlas` and `us-atlas`. Roads, lakes and rivers: Natural Earth 1:10m.

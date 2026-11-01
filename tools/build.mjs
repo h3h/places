@@ -64,6 +64,7 @@ emit('details', JSON.stringify(details));
 emit('countries', min(pkg('world-atlas/countries-50m.json')));
 emit('states', min(pkg('us-atlas/states-10m.json')));
 emit('roads', min(read('data/roads.json')));
+emit('water', min(read('data/water.json')));
 
 const parts = {
   PTS: embed(JSON.stringify(core)),

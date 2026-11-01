@@ -9,5 +9,5 @@ node_modules/
 *.zip
 data/import/
 data/browser/
-tools/roads/ne_10m_roads.geojson
+tools/roads/ne_10m_*.geojson
 __pycache__/
