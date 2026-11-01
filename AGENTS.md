@@ -6,6 +6,7 @@ Guidance for AI coding agents working in this repository.
 
 - Do **not** add co-author or co-sign trailers to commit messages. No `Co-Authored-By:`, `Signed-off-by:`, `Claude-Session:` or similar lines, and no "Generated with" footers in commits or pull requests.
 - Commit as the repository owner's configured git identity; don't override `user.name` or `user.email`.
+- No PRs; everything in this repo goes directly to `main`.
 
 ## Project
 
