@@ -1,6 +1,6 @@
 // Build dist/ from src/template.html + data/*.json + map boundary packages.
-// index.html carries only what the first view needs (core point fields, 110m borders);
-// details, fine borders, states and roads are content-hashed files the page fetches when needed.
+// index.html carries only what the first view needs (core point fields, 110m borders and lakes);
+// details, 50m borders and lakes, states, roads and water are content-hashed files the page fetches when needed.
 // Usage: npm run build
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -65,10 +65,13 @@ emit('countries', min(pkg('world-atlas/countries-50m.json')));
 emit('states', min(pkg('us-atlas/states-10m.json')));
 emit('roads', min(read('data/roads.json')));
 emit('water', min(read('data/water.json')));
+const lakes = JSON.parse(read('data/lakes.json'));
+emit('lakes', JSON.stringify(lakes.fine));
 
 const parts = {
   PTS: embed(JSON.stringify(core)),
   COUNTRIES: embed(min(pkg('world-atlas/countries-110m.json'))),
+  LAKES: embed(JSON.stringify(lakes.coarse)),
   FILES: embed(JSON.stringify(files)),
 };
 let html = read('src/template.html');

@@ -7,7 +7,7 @@ Want to go list. Live at https://h3h.github.io/places/
 
 | Path | What it is |
 |---|---|
-| `src/template.html` | The app: one HTML page (styles, d3 map code, search, filters) with `{{PTS}}`, `{{COUNTRIES}}` and `{{FILES}}` placeholders for the data the first view needs |
+| `src/template.html` | The app: one HTML page (styles, d3 map code, search, filters) with `{{PTS}}`, `{{COUNTRIES}}`, `{{LAKES}}` and `{{FILES}}` placeholders for the data the first view needs |
 | `data/places.json` | The curated place list, one record per line (see fields below). This is the source of truth |
 | `data/roads.json` | Natural Earth roads within 50 km of a place, compacted for the page |
 | `tools/build.mjs` | Fills the template and writes `dist/`: `index.html` carries core place fields and 110m borders; place details, 50m borders, states and roads go to content-hashed JSON files the page fetches when needed |
@@ -15,7 +15,8 @@ Want to go list. Live at https://h3h.github.io/places/
 | `tools/takeout/import_takeout.py` | Turns a Google Takeout export into candidate places, optionally merging new ones |
 | `tools/roads/clip_roads.py` | Rebuilds `data/roads.json` from the Natural Earth roads dataset |
 | `data/water.json` | Natural Earth lakes and rivers near a place, in the roads format, shown with the roads |
-| `tools/roads/clip_water.py` | Rebuilds `data/water.json` from the Natural Earth lakes and rivers datasets |
+| `data/lakes.json` | Every Natural Earth 1:110m lake (embedded in the page) and 1:50m lake (loaded with the 50m borders), so big lakes show from the world view |
+| `tools/roads/clip_water.py` | Rebuilds `data/water.json` and `data/lakes.json` from the Natural Earth lakes and rivers datasets |
 | `tools/browser/*.js` | Console scripts for a logged-in Google Maps tab: read the newest places in a list, and look up status, coordinates and categories |
 | `tools/browser/places_tool.py` | Feeds place IDs to those scripts and merges their results back into `data/places.json` |
 
