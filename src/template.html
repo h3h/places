@@ -8,6 +8,9 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- start the libraries now; their script tags sit after the inline data at the end of the page -->
+<link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js">
+<link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: one-screen map with a floating survey panel (stacked under the map on phones). Palette: Tokyo Night, single dark look. */
@@ -200,7 +203,12 @@ h1{margin:0;font-weight:800;font-stretch:72%;font-size:30px;line-height:.95;lett
 (function(){
 const ALL = JSON.parse(document.getElementById('pts').textContent);
 let countries, borders, stateLines=null, ROADS=null, DET=false;
-function setCountries(ct){ countries=topojson.feature(ct, ct.objects.countries); borders=topojson.mesh(ct, ct.objects.countries, (a,b)=>a!==b); }
+// countries and border/state lines are kept as parts with lon/lat boxes, so zoomed-in frames skip what's off screen
+function box(c){ let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  (function v(a){ if(typeof a[0]==='number'){ if(a[0]<x0)x0=a[0]; if(a[0]>x1)x1=a[0]; if(a[1]<y0)y0=a[1]; if(a[1]>y1)y1=a[1]; } else a.forEach(v); })(c); return [x0,y0,x1,y1]; }
+const lineParts=m=>m.coordinates.map(c=>({g:{type:'LineString',coordinates:c}, bb:box(c)}));
+function setCountries(ct){ countries=topojson.feature(ct, ct.objects.countries).features.filter(f=>f.geometry).map(f=>({g:f, bb:box(f.geometry.coordinates)}));
+  borders=lineParts(topojson.mesh(ct, ct.objects.countries, (a,b)=>a!==b)); }
 setCountries(JSON.parse(document.getElementById('countries').textContent));
 
 // layers kept out of index.html, fetched once when first needed
@@ -208,7 +216,7 @@ const FILES = JSON.parse(document.getElementById('files').textContent), loads={}
 function need(name, use){ return loads[name] ||= fetch(FILES[name]).then(r=>{ if(!r.ok) throw new Error(`${FILES[name]}: ${r.status}`); return r.json(); })
   .then(d=>{ use(d); schedule(); }).catch(e=>{ delete loads[name]; console.error(e); throw e; }); }
 const loadDetails=()=>need('details', d=>{ d.forEach((o,i)=>Object.assign(ALL[i],o)); DET=true; buildIdx(); if(!palback.hidden) palRender(); });
-const loadStates=()=>need('states', st=>{ stateLines=topojson.mesh(st, st.objects.states, (a,b)=>a!==b); });
+const loadStates=()=>need('states', st=>{ stateLines=lineParts(topojson.mesh(st, st.objects.states, (a,b)=>a!==b)); });
 
 const canvas = document.getElementById('map'), ctx = canvas.getContext('2d');
 const wrap = document.getElementById('mapwrap');
@@ -267,9 +275,13 @@ function draw(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle=colors.ocean; ctx.fillRect(0,0,W,H);
   const path=d3.geoPath(proj,ctx);
-  ctx.beginPath(); path(countries); ctx.fillStyle=colors.land; ctx.fill();
-  if(stateLines){ ctx.beginPath(); path(stateLines); ctx.strokeStyle=colors.state; ctx.lineWidth=.8; ctx.stroke(); }
-  ctx.beginPath(); path(borders); ctx.strokeStyle=colors.border; ctx.lineWidth=1; ctx.stroke();
+  // visible lon/lat box; null (draw everything) when zoomed out or the view crosses the antimeridian
+  const tl=proj.invert([-20,-20]), br=proj.invert([W+20,H+20]);
+  const v=T.k>FINE_AT&&tl&&br&&tl[0]<br[0] ? [tl[0],br[1],br[0],tl[1]] : null;
+  const parts=ps=>{ for(const p of ps){ const b=p.bb; if(!v||!(b[2]<v[0]||b[0]>v[2]||b[3]<v[1]||b[1]>v[3])) path(p.g); } };
+  ctx.beginPath(); parts(countries); ctx.fillStyle=colors.land; ctx.fill();
+  if(stateLines){ ctx.beginPath(); parts(stateLines); ctx.strokeStyle=colors.state; ctx.lineWidth=.8; ctx.stroke(); }
+  ctx.beginPath(); parts(borders); ctx.strokeStyle=colors.border; ctx.lineWidth=1; ctx.stroke();
   drawRoads();
 
   shown = filtered().map(p=>{const [x,y]=proj([p.lon,p.lat]); return {p,x,y}}).filter(o=>o.x>-80&&o.y>-80&&o.x<W+80&&o.y<H+80);
