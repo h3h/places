@@ -202,14 +202,15 @@ h1{margin:0;font-weight:800;font-stretch:72%;font-size:30px;line-height:.95;lett
 <script>
 (function(){
 const ALL = JSON.parse(document.getElementById('pts').textContent);
-let countries, borders, stateLines=null, ROADS=null, DET=false;
+let stateLines=null, ROADS=null, DET=false;
 // countries and border/state lines are kept as parts with lon/lat boxes, so zoomed-in frames skip what's off screen
 function box(c){ let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
   (function v(a){ if(typeof a[0]==='number'){ if(a[0]<x0)x0=a[0]; if(a[0]>x1)x1=a[0]; if(a[1]<y0)y0=a[1]; if(a[1]>y1)y1=a[1]; } else a.forEach(v); })(c); return [x0,y0,x1,y1]; }
 const lineParts=m=>m.coordinates.map(c=>({g:{type:'LineString',coordinates:c}, bb:box(c)}));
-function setCountries(ct){ countries=topojson.feature(ct, ct.objects.countries).features.filter(f=>f.geometry).map(f=>({g:f, bb:box(f.geometry.coordinates)}));
-  borders=lineParts(topojson.mesh(ct, ct.objects.countries, (a,b)=>a!==b)); }
-setCountries(JSON.parse(document.getElementById('countries').textContent));
+const shapes=ct=>({countries:topojson.feature(ct, ct.objects.countries).features.filter(f=>f.geometry).map(f=>({g:f, bb:box(f.geometry.coordinates)})),
+  borders:lineParts(topojson.mesh(ct, ct.objects.countries, (a,b)=>a!==b))});
+// 110m stays in use below FINE_AT: the whole world at 50m took ~600 ms a frame at 4x CPU slowdown
+const COARSE=shapes(JSON.parse(document.getElementById('countries').textContent)); let FINE=null;
 
 // layers kept out of index.html, fetched once when first needed
 const FILES = JSON.parse(document.getElementById('files').textContent), loads={};
@@ -230,11 +231,13 @@ function makeLUT(stops){const c=document.createElement('canvas');c.width=256;c.h
   const gr=g.createLinearGradient(0,0,256,0);stops.forEach(([c,o])=>gr.addColorStop(o,c));
   g.fillStyle=gr;g.fillRect(0,0,256,1);return g.getImageData(0,0,256,1).data}
 const LUTF=makeLUT([['#4b3a8c',0],['#7a5cc7',.3],['#bb9af7',.55],['#f7768e',.8],['#ffd1dc',1]]), LUTW=makeLUT([['#1d5f5c',0],['#1f8f86',.3],['#73daca',.55],['#9ece6a',.8],['#e6f5b0',1]]);
-function heatLayer(list,LUT){ const r=state.rad;
-  heat.width=W; heat.height=H; hctx.clearRect(0,0,W,H);
-  for(const o of list){ const g=hctx.createRadialGradient(o.x,o.y,0,o.x,o.y,r);
-    g.addColorStop(0,'rgba(0,0,0,0.13)'); g.addColorStop(1,'rgba(0,0,0,0)'); hctx.fillStyle=g; hctx.fillRect(o.x-r,o.y-r,2*r,2*r); }
-  const img=hctx.getImageData(0,0,W,H), d=img.data;
+// half resolution while panning/zooming (the per-pixel pass dominates frames on slow phones); full when it settles
+let moving=false;
+function heatLayer(list,LUT){ const s=moving?.5:1, r=state.rad*s, hw=Math.ceil(W*s), hh=Math.ceil(H*s);
+  heat.width=hw; heat.height=hh; hctx.clearRect(0,0,hw,hh);
+  for(const o of list){ const x=o.x*s, y=o.y*s, g=hctx.createRadialGradient(x,y,0,x,y,r);
+    g.addColorStop(0,'rgba(0,0,0,0.13)'); g.addColorStop(1,'rgba(0,0,0,0)'); hctx.fillStyle=g; hctx.fillRect(x-r,y-r,2*r,2*r); }
+  const img=hctx.getImageData(0,0,hw,hh), d=img.data;
   for(let i=3;i<d.length;i+=4){ const a=d[i]; if(!a) continue; const j=Math.min(255,a*1.25|0)*4;
     d[i-3]=LUT[j]; d[i-2]=LUT[j+1]; d[i-1]=LUT[j+2]; d[i]=Math.min(235, 70+a*2.4); }
   hctx.putImageData(img,0,0); }
@@ -270,7 +273,8 @@ function drawRoads(){
 function draw(){
   if(!W||!H) return;
   applyT();
-  if(T.k>FINE_AT) need('countries', setCountries).catch(()=>{});
+  if(T.k>FINE_AT) need('countries', ct=>{ FINE=shapes(ct); }).catch(()=>{});
+  const {countries, borders}=T.k>FINE_AT&&FINE ? FINE : COARSE;
   if(T.k>ROAD_IN/2) loadRoads().catch(()=>{});
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle=colors.ocean; ctx.fillRect(0,0,W,H);
@@ -353,7 +357,8 @@ function renderSpots(){
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 // zoom
-const zoom=d3.zoom().scaleExtent([.8,6000]).on('zoom',e=>{T=e.transform; tip.hidden=true; schedule();});
+const zoom=d3.zoom().scaleExtent([.8,6000]).on('zoom',e=>{T=e.transform; tip.hidden=true; schedule();})
+  .on('start',()=>{moving=true;}).on('end',()=>{moving=false; schedule();});
 let raf=0; function schedule(){ if(!raf) raf=requestAnimationFrame(()=>{raf=0;draw();}); }
 d3.select(canvas).call(zoom).on('dblclick.zoom',null);
 function boundsT(b,minSpan=0){ // b=[w,s,e,n]
