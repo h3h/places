@@ -1,7 +1,7 @@
 // Fill in derived fields on data/places.json:
 //   co  - country, from the coordinates (point-in-polygon on Natural Earth 1:50m borders,
 //         falling back to the nearest border vertex for coastal points just outside a polygon)
-//   ci  - display city, cleaned from the address-derived "c" field; places without one borrow
+//   ci  - display city, cleaned from the address-derived "c" field (US states spelled out); places without one borrow
 //         the nearest city within 25 km (and get cin: 1 so hot-spot labels ignore it)
 // Existing co/ci values are recomputed every run, so this is safe to re-run.
 // Usage: npm run enrich
@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { geoContains, geoDistance } from 'd3';
 import { feature } from 'topojson-client';
+import { US_STATES } from './states.mjs';
 const require = createRequire(import.meta.url);
 const root = new URL('..', import.meta.url).pathname;
 
@@ -26,12 +27,11 @@ function countryOf(lon, lat) {
   return RENAME[best] || best;
 }
 
-const US = new Set('AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC'.split(' '));
 const CITY_NAMES = { CDMX: 'Mexico City', 'Ciudad de México': 'Mexico City', 'B.C.S.': 'Baja California Sur', Luzern: 'Lucerne', 'Zürich': 'Zurich', 'München': 'Munich' };
 function cleanCity(c, country) {
   if (!c) return null;
   const i = c.indexOf(', '), first = i < 0 ? c : c.slice(0, i), rest = i < 0 ? '' : c.slice(i + 2).trim();
-  if (US.has(rest)) return `${first}, ${rest}`;
+  if (US_STATES[rest]) return `${first}, ${US_STATES[rest]}`;
   let s = first.replace(/^([A-Z]{2}\s+)+/, '')               // Dutch postcode letters, e.g. "KH Amsterdam"
     .replace(/\s+(QLD|NSW|VIC|WA|SA|TAS|NT|ACT)$/, '')       // Australian state suffixes
     .replace(/^\d[\d\s-]*/, '').trim();

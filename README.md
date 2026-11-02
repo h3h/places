@@ -41,7 +41,7 @@ npm run serve        # build, then serve on http://localhost:8000
  "st":5,             // review stars (reviews only)
  "g":["Coffee shop","Art gallery"],   // Google categories
  "ap":1,             // position is approximate (decoded from the feature ID)
- "co":"United States", "ci":"Austin, TX", "cin":1}  // derived by enrich; cin = city borrowed from a nearby place
+ "co":"United States", "ci":"Austin, Texas", "cin":1}  // derived by enrich; cin = city borrowed from a nearby place
 ```
 
 ## Updating the data

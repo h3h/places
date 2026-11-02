@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { spellOutAddress } from './states.mjs';
 const require = createRequire(import.meta.url);
 const root = new URL('..', import.meta.url).pathname;
 const dist = root + 'dist/';
@@ -49,6 +50,7 @@ const core = places.map(p => {
 const details = places.map(p => {
   const o = {};
   for (const f of ['n', 'a', 'd', 'u', 'st', 'g', 'ap', 'co']) if (p[f] != null) o[f] = p[f];
+  if (o.a) o.a = spellOutAddress(o.a);
   return o;
 });
 
