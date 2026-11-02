@@ -410,7 +410,7 @@ function renderCats(){
 function show(p){ if(!DET){ loadDetails().then(()=>show(p),()=>{}); return; } selected=p;
   const kind=p.k==='s'?'Favorite place':p.k==='w'?'Place I want to go':'Reviewed'+(p.st?` · ${'★'.repeat(p.st)}${'☆'.repeat(5-p.st)}`:'');
   card.innerHTML=`<button class="x" aria-label="Close">×</button><h2>${esc(p.n)}</h2>
-   ${p.g&&p.g.length?`<div class="meta" style="color:var(--ink)">${esc(p.g.join(' · '))}</div>`:''}<div class="meta">${esc(p.a||'')}</div><div class="meta">${kind}${p.d?' · '+p.d:''}${p.ap?' · position within ~1 km':''}</div>
+   ${p.g&&p.g.length?`<div class="meta" style="color:var(--ink)">${esc(p.g.join(' · '))}</div>`:''}${p.w?`<div class="meta">${esc(p.w)}</div>`:''}<div class="meta">${kind}${p.d?' · '+p.d:''}${p.ap?' · position within ~1 km':''}</div>
    <div class="coord">${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}</div>
    ${p.u?`<a href="${esc(p.u)}" target="_blank" rel="noopener">Open in Google Maps ↗</a>`:''}`;
   card.hidden=false; card.querySelector('.x').onclick=()=>{selected=null;card.hidden=true;draw();}; draw(); }

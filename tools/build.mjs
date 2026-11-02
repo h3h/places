@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { spellOutAddress } from './states.mjs';
+import { placeLine } from './states.mjs';
 const require = createRequire(import.meta.url);
 const root = new URL('..', import.meta.url).pathname;
 const dist = root + 'dist/';
@@ -49,8 +49,9 @@ const core = places.map(p => {
 // Everything else the card and search use, in the same order as core.
 const details = places.map(p => {
   const o = {};
-  for (const f of ['n', 'a', 'd', 'u', 'st', 'g', 'ap', 'co']) if (p[f] != null) o[f] = p[f];
-  if (o.a) o.a = spellOutAddress(o.a);
+  for (const f of ['n', 'd', 'u', 'st', 'g', 'ap', 'co']) if (p[f] != null) o[f] = p[f];
+  const w = placeLine(p); // card's "where" line, in place of the street address
+  if (w) o.w = w;
   return o;
 });
 
